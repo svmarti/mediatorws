@@ -59,7 +59,10 @@ class StationLiteSchema(Schema):
 
     nodata = NoData()
     alternative = FDSNWSBool(missing='false')
-
+    access = fields.Str(
+        missing='any',
+        validate=validate.OneOf(
+            ['open', 'closed', 'any']))
     level = fields.Str(
         missing='channel',
         validate=validate.OneOf(
@@ -111,6 +114,13 @@ class StationLiteSchema(Schema):
         if (data['minlatitude'] >= data['maxlatitude'] or
                 data['minlongitude'] >= data['maxlongitude']):
             raise ValidationError('Bad Request: Invalid spatial constraints.')
+
+    @validates_schema
+    def validate_access(self, data):
+        if (data['access'] != 'any' and data['service'] != 'dataselect'):
+            raise ValidationError(
+                "Bad Request: Invalid 'access' value {!r} for service "
+                "{!r}".format(data['access'], data['service']))
 
     class Meta:
         strict = True
