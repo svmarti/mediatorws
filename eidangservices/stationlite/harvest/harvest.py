@@ -313,10 +313,12 @@ class RoutingHarvester(Harvester):
     def _harvest_from_stationxml(self, session, station_xml):
         """
         Create/update Network, Station and ChannelEpoch objects from a
-        station.xml file.
+        STATIONXML file.
 
-        :param :cls:`sqlalchemy.orm.sessionSession` session: SQLAlchemy session
-        :param :cls:`io.BinaryIO` station_xml: Station XML file stream
+        :param session: SQLAlchemy session
+        :type session: :py:class:`sqlalchemy.orm.sessionSession`
+        :param station_xml: Station XML file stream
+        :type station_xml: :py:class:`io.BinaryIO`
         """
 
         try:
@@ -353,7 +355,7 @@ class RoutingHarvester(Harvester):
 
     def _emerge_service(self, session, service_tag):
         """
-        Factory method for a orm.Service object.
+        Factory method for a :py:class:`orm.Service` object.
         """
         try:
             service = session.query(orm.Service).\
@@ -375,7 +377,7 @@ class RoutingHarvester(Harvester):
 
     def _emerge_endpoint(self, session, url, service):
         """
-        Factory method for a orm.Endpoint object.
+        Factory method for a :py:class:`orm.Endpoint` object.
         """
 
         try:
@@ -874,7 +876,7 @@ class VNetHarvester(Harvester):
 
     def _emerge_streamepoch_group(self, session, element):
         """
-        Factory method for a orm.StreamEpochGroup
+        Factory method for a :code:`orm.StreamEpochGroup`
         """
         net_code = element.get('networkCode')
         if not net_code:
@@ -904,7 +906,7 @@ class VNetHarvester(Harvester):
 
     def _emerge_streamepoch(self, session, channel_epoch, stream_epoch, vnet):
         """
-        Factory method for a orm.StreamEpoch object.
+        Factory method for a :code:`orm.StreamEpoch` object.
         """
         # check if overlapping with a StreamEpoch already existing
         # XXX(damb)_ Overlapping orm.StreamEpoch objects regarding time
@@ -1138,10 +1140,10 @@ class StationLiteHarvestApp(App):
 
     def _harvest_routes(self, Session):
         """
-        Harvest the EIDA node's <route></route> information.
+        Harvest the EIDA node's :code:`<route></route>` information.
 
-        :param :cls:`sqlalchemy.orm.session.Session` Session: A configured
-        Session class reference.
+        :param Session: A configured Session class reference
+        :type Session: :py:class:`sqlalchemy.orm.session.Session`
         """
         for node_name, node_par in node_generator(
                 exclude=self.args.nodes_exclude):
@@ -1169,10 +1171,10 @@ class StationLiteHarvestApp(App):
 
     def _harvest_vnetworks(self, Session):
         """
-        Harvest the EIDA node's <vnetwork></vnetwork> information.
+        Harvest the EIDA node's :code:`<vnetwork></vnetwork>` information.
 
-        :param :cls:`sqlalchemy.orm.session.Session` Session: A configured
-        Session class reference.
+        :param Session: A configured Session class reference
+        :type Session: :py:class:`sqlalchemy.orm.session.Session`
         """
         for node_name, node_par in node_generator(
                 exclude=self.args.nodes_exclude):
