@@ -116,6 +116,13 @@ class StationLiteSchema(Schema):
             raise ValidationError('Bad Request: Invalid spatial constraints.')
 
     @validates_schema
+    def validate_level(self, data):
+        if (data['level'] != 'channel' and data['service'] != 'station'):
+            raise ValidationError(
+                "Bad Request: Invalid 'level' value {!r} for service "
+                "{!r}".format(data['level'], data['service']))
+
+    @validates_schema
     def validate_access(self, data):
         if (data['access'] != 'any' and data['service'] != 'dataselect'):
             raise ValidationError(
