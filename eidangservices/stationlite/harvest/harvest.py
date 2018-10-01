@@ -1253,6 +1253,8 @@ class StationLiteHarvestApp(App):
 
             except RequestsError as err:
                 self.logger.warning(str(err))
+            except Harvester.HarvesterError as err:
+                self.logger.error(str(err))
 
     # _harvest_routes ()
 
@@ -1283,6 +1285,8 @@ class StationLiteHarvestApp(App):
 
             except RequestsError as err:
                 self.logger.warning(str(err))
+            except Harvester.HarvesterError as err:
+                self.logger.error(str(err))
 
     # _harvest_vnetworks ()
 
