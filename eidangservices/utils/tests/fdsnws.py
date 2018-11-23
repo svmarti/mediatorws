@@ -60,7 +60,7 @@ class FDSNWSParserTestCase(unittest.TestCase):
         class Meta:
             strict = True
 
-    # class TestŜchema
+    # class TestSchema
 
     @mock.patch('flask.request')
     def test_get_single(self, mock_request):

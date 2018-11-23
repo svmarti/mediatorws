@@ -33,6 +33,7 @@ from __future__ import (absolute_import, division, print_function,
 from builtins import * # noqa
 
 import functools
+import inspect
 import itertools
 import sys
 import traceback
@@ -135,6 +136,9 @@ class FDSNWSParser(FlaskParser):
         for line in req_buffer:
             check_param = line.split(
                 settings.FDSNWS_QUERY_VALUE_SEPARATOR_CHAR)
+            #if all(w == '' for w in check_param):
+            #    raise FDSNHTTPError.create(
+            #            400, error_desc_long='RTFM :).')
             if len(check_param) == 2:
 
                 # add query params
