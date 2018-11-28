@@ -158,7 +158,7 @@ class RequestProcessor(object):
         :raises KeyError: if an invalid format string was passed
         """
         if service == 'dataselect':
-            return RawRequestProcessor(*args, **kwargs)
+            return DataselectRequestProcessor(*args, **kwargs)
         elif service == 'station':
             return StationRequestProcessor.create(
                 kwargs['query_params'].get('format', 'xml'), *args, **kwargs)
@@ -344,7 +344,7 @@ class RequestProcessor(object):
 # class RequestProcessor
 
 
-class RawRequestProcessor(RequestProcessor):
+class DataselectRequestProcessor(RequestProcessor):
     """
     Federating request processor implementation controlling both the federated
     downloading process and the merging afterwards.
@@ -480,7 +480,7 @@ class RawRequestProcessor(RequestProcessor):
 
     # __iter__ ()
 
-# class RawRequestProcessor
+# class DataselectRequestProcessor
 
 
 class StationRequestProcessor(RequestProcessor):
