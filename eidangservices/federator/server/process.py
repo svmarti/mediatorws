@@ -346,8 +346,13 @@ class RequestProcessor(object):
 
 class DataselectRequestProcessor(RequestProcessor):
     """
-    Federating request processor implementation controlling both the federated
-    downloading process and the merging afterwards.
+    Federating request processor implementation for :code:`fdsnws-dataselect`.
+    Controls both the federated downloading process and the merging of the
+    `miniSEED http://ds.iris.edu/ds/nodes/dmc/data/formats/miniseed/` data,
+    afterwards.
+
+    Handles HTTP status code **413** from endpoints by splitting a
+    stream epoch into smaller chunks and merging those chunks appropriately.
     """
 
     LOGGER = "flask.app.federator.request_processor_raw"
