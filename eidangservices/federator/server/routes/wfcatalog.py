@@ -39,7 +39,6 @@ from flask import request
 from flask_restful import Resource
 from webargs.flaskparser import use_args
 
-from eidangservices import settings
 from eidangservices.federator import __version__
 from eidangservices.federator.server.schema import WFCatalogSchema
 from eidangservices.federator.server.process import RequestProcessor
@@ -95,7 +94,6 @@ class WFCatalogResource(Resource):
 
         # process request
         return RequestProcessor.create(args['service'],
-                                       settings.WFCATALOG_MIMETYPE,
                                        query_params=args,
                                        stream_epochs=stream_epochs,
                                        post=False).streamed_response
@@ -128,7 +126,6 @@ class WFCatalogResource(Resource):
 
         # process request
         return RequestProcessor.create(args['service'],
-                                       settings.WFCATALOG_MIMETYPE,
                                        query_params=args,
                                        stream_epochs=stream_epochs,
                                        post=True).streamed_response
@@ -136,5 +133,6 @@ class WFCatalogResource(Resource):
     # post ()
 
 # class WFCatalogResource
+
 
 # ---- END OF <wfcatalog.py> ----

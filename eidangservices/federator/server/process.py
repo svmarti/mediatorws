@@ -120,21 +120,24 @@ class RequestProcessor(object):
 
     LOGGER = "flask.app.federator.request_processor"
 
+    MIMETYPE = None
     POOL_SIZE = 5
     # MAX_TASKS_PER_CHILD = 4
     TIMEOUT_STREAMING = settings.EIDA_FEDERATOR_STREAMING_TIMEOUT
 
-    def __init__(self, mimetype, query_params={}, stream_epochs=[], post=True,
+    def __init__(self, query_params={}, stream_epochs=[], post=True,
                  **kwargs):
-        self.mimetype = mimetype
-        self.content_type = (
-            '{}; {}'.format(self.mimetype, settings.CHARSET_TEXT)
-            if self.mimetype == settings.MIMETYPE_TEXT else self.mimetype)
         self.query_params = query_params
         self.stream_epochs = stream_epochs
         self.post = post
 
-        self._routing_service = current_app.config['ROUTING_SERVICE']
+        self.mimetype = kwargs.get('mimetype', self.MIMETYPE)
+        if not self.mimetype:
+            raise TypeError('Invalid mimetype value: {!r}'.format(self.mimetype))
+
+        self.content_type = (
+            '{}; {}'.format(self.mimetype, settings.CHARSET_TEXT)
+            if self.mimetype == settings.MIMETYPE_TEXT else self.mimetype)
 
         self.logger = logging.getLogger(
             self.LOGGER if kwargs.get('logger') is None
@@ -375,6 +378,7 @@ class DataselectRequestProcessor(RequestProcessor):
     LOGGER = "flask.app.federator.request_processor_raw"
 
     CHUNK_SIZE = 1024
+    MIMETYPE = settings.DATASELECT_MIMETYPE
 
     @property
     def POOL_SIZE(self):
@@ -519,9 +523,9 @@ class StationRequestProcessor(RequestProcessor):
 
     LOGGER = "flask.app.federator.request_processor_station"
 
-    def __init__(self, mimetype, query_params={}, stream_epochs=[], post=True,
+    def __init__(self, query_params={}, stream_epochs=[], post=True,
                  **kwargs):
-        super().__init__(mimetype, query_params, stream_epochs, post, **kwargs)
+        super().__init__(query_params, stream_epochs, post, **kwargs)
 
         self._level = query_params.get('level')
         if self._level is None:
@@ -569,6 +573,7 @@ class StationXMLRequestProcessor(StationRequestProcessor):
     resulting data is combined and temporarly saved. Finally
     StationRequestProcessor implementations merge the final result.
     """
+    MIMETYPE = settings.STATION_MIMETYPE_XML
     CHUNK_SIZE = 1024
 
     SOURCE = 'EIDA'
@@ -688,6 +693,7 @@ class StationTextRequestProcessor(StationRequestProcessor):
     This processor implementation implements fdsnws-station text federatation.
     Data is fetched multithreaded from endpoints.
     """
+    MIMETYPE = settings.STATION_MIMETYPE_TEXT
     HEADER_NETWORK = '#Network|Description|StartTime|EndTime|TotalStations'
     HEADER_STATION = (
         '#Network|Station|Latitude|Longitude|'
@@ -803,6 +809,7 @@ class WFCatalogRequestProcessor(RequestProcessor):
     """
     LOGGER = "flask.app.federator.request_processor_wfcatalog"
 
+    MIMETYPE = settings.WFCATALOG_MIMETYPE
     CHUNK_SIZE = 1024
 
     JSON_LIST_START = '['
