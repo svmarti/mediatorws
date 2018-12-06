@@ -61,16 +61,17 @@ from eidangservices.utils.sncl import StreamEpoch
 # corresponding combiner tasks.
 
 def demux_routes(routes):
-    return [utils.Route(route.url, streams=[se]) for route in routes
-            for se in route.streams]
+    return [utils.Route(url=route.url, streams=[se], auth=route.auth)
+            for route in routes for se in route.streams]
 
 # demux_routes ()
 
 def group_routes_by(routes, key='network'):
     """
-    Group routes by a certain :py:class:`eidangservices.sncl.Stream` keyword.
-    Combined keywords are also possible e.g. network.station. When combining
-    keys the seperating character is `.`. Routes are demultiplexed.
+    Group routes by a certain :py:class:`eidangservices.sncl.Stream` property
+    keyword. Combined keywords are also possible e.g. :code:`network.station`.
+    When combining keys the seperating character is :code:`.`. Routes are
+    returned demultiplexed.
 
     :param list routes: List of :py:class:`eidangservices.utils.Route` objects
     :param str key: Key used for grouping.
@@ -177,6 +178,8 @@ class RequestProcessor(object):
     def streamed_response(self):
         """
         Return a streamed :py:class:`flask.Response`.
+
+        :rtype: :py:class:`flask.Response`
         """
         self._request()
 
@@ -255,6 +258,15 @@ class RequestProcessor(object):
         self.logger.warning(str(err))
 
     def _handle_413(self, result):
+        """
+        Handle HTTP status code **413** from endpoints.
+
+        :param result: Request which lead to code **413**
+        :type result:
+            :py:class:`eidangservices.federator.server.request.RequestHandlerBase`
+
+        :raises: :py:class:`eidangservices.utils.httperrors.FDSNHTTPError`
+        """
         self.logger.warning(
             'Handle endpoint HTTP status code 413 (url={}, '
             'stream_epochs={}).'.format(result.data.url,
@@ -316,7 +328,8 @@ class RequestProcessor(object):
 
     def _request(self):
         """
-        Template method.
+        Template method used to actually issue the endpoint requests. Must be
+        implemented by concrete :py:class:`RequestProcessor` implementations.
         """
         raise NotImplementedError
 
@@ -339,6 +352,10 @@ class RequestProcessor(object):
     # _call_on_close ()
 
     def __iter__(self):
+        """
+        Template method making the processor *streamable*. Must be implemented
+        by concrete :py:class:`RequestProcessor` implementations.
+        """
         raise NotImplementedError
 
 # class RequestProcessor
@@ -365,7 +382,7 @@ class DataselectRequestProcessor(RequestProcessor):
 
     def _request(self):
         """
-        process a federated request
+        Request data from :code:`fdsnws-dataselect` endpoints.
         """
         routes = demux_routes(self._route())
 
@@ -414,7 +431,7 @@ class DataselectRequestProcessor(RequestProcessor):
 
     def __iter__(self):
         """
-        Make the processor *streamable*.
+        Process the federated request. Makes the processor *streamable*.
         """
         # TODO(damb): The processor has to write metadata to the log database.
         # Also in case of errors.
@@ -495,7 +512,7 @@ class StationRequestProcessor(RequestProcessor):
     the number of endpoint requests.
 
     StationRequestProcessor implementations come along with a *reducing*
-    `_route ()` implementation. Routes received from the *StationLite*
+    :code:`_route ()` implementation. Routes received from the *StationLite*
     webservice are reduced depending on the value of the `level` query
     parameter.
     """
@@ -564,7 +581,8 @@ class StationXMLRequestProcessor(StationRequestProcessor):
 
     def _request(self):
         """
-        Process a federated fdsnws-station XML request.
+        Request data from :code:`fdsnws-station` endpoints with
+        :code:`format=xml`.
         """
         routes = self._route()
 
@@ -592,7 +610,7 @@ class StationXMLRequestProcessor(StationRequestProcessor):
 
     def __iter__(self):
         """
-        Make the processor *streamable*.
+        Process the federated request. Makes the processor *streamable*.
         """
         def generate_chunks(fd, chunk_size=self.CHUNK_SIZE):
             while True:
@@ -685,7 +703,8 @@ class StationTextRequestProcessor(StationRequestProcessor):
 
     def _request(self):
         """
-        Process a federated fdsnws-station text request
+        Request data from :code:`fdsnws-station` endpoints with
+        :code:`format=text`.
         """
         routes = flatten_routes(self._route())
 
@@ -713,7 +732,7 @@ class StationTextRequestProcessor(StationRequestProcessor):
 
     def __iter__(self):
         """
-        Make the processor *streamable*.
+        Process the federated request. Makes the processor *streamable*.
         """
         while True:
             ready = []
@@ -796,7 +815,7 @@ class WFCatalogRequestProcessor(RequestProcessor):
 
     def _request(self):
         """
-        process a federated fdsnws-station text request
+        Request data from :code:`eidaws-wfcatalog` endpoints.
         """
         routes = demux_routes(self._route())
 
@@ -845,7 +864,7 @@ class WFCatalogRequestProcessor(RequestProcessor):
 
     def __iter__(self):
         """
-        Make the processor *streamable*.
+        Process the federated request. Makes the processor *streamable*.
         """
         def generate_chunks(fd, chunk_size=self.CHUNK_SIZE):
             _size = os.fstat(fd.fileno()).st_size
