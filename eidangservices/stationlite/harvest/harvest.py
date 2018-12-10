@@ -487,7 +487,7 @@ class RoutingHarvester(Harvester):
         """
         try:
             net = session.query(orm.Network).\
-                filter(orm.Network.name == network.code).\
+                filter(orm.Network.code == network.code).\
                 one_or_none()
         except MultipleResultsFound as err:
             raise self.IntegrityError(err)
@@ -502,7 +502,7 @@ class RoutingHarvester(Harvester):
 
         # check if network already available - else create a new one
         if net is None:
-            net = orm.Network(name=network.code)
+            net = orm.Network(code=network.code)
             net_epoch = orm.NetworkEpoch(
                 description=network.description,
                 starttime=network.start_date.datetime,
@@ -561,7 +561,7 @@ class RoutingHarvester(Harvester):
         """
         try:
             sta = session.query(orm.Station).\
-                filter(orm.Station.name == station.code).\
+                filter(orm.Station.code == station.code).\
                 one_or_none()
         except MultipleResultsFound as err:
             raise self.IntegrityError(err)
@@ -577,7 +577,7 @@ class RoutingHarvester(Harvester):
 
         # check if station already available - else create a new one
         if sta is None:
-            sta = orm.Station(name=station.code)
+            sta = orm.Station(code=station.code)
             station_epoch = orm.StationEpoch(
                 description=station.description,
                 starttime=station.start_date.datetime,
@@ -649,7 +649,7 @@ class RoutingHarvester(Harvester):
         query = session.query(orm.ChannelEpoch).\
             filter(orm.ChannelEpoch.network == network).\
             filter(orm.ChannelEpoch.station == station).\
-            filter(orm.ChannelEpoch.channel == channel.code).\
+            filter(orm.ChannelEpoch.code == channel.code).\
             filter(orm.ChannelEpoch.locationcode == channel.location_code)
 
         # check if overlapping with ChannelEpoch already existing
@@ -683,7 +683,7 @@ class RoutingHarvester(Harvester):
         query = session.query(orm.ChannelEpoch).\
             filter(orm.ChannelEpoch.network == network).\
             filter(orm.ChannelEpoch.station == station).\
-            filter(orm.ChannelEpoch.channel == channel.code).\
+            filter(orm.ChannelEpoch.code == channel.code).\
             filter(orm.ChannelEpoch.locationcode == channel.location_code).\
             filter(orm.ChannelEpoch.restrictedstatus !=
                    channel.restricted_status)
@@ -703,7 +703,7 @@ class RoutingHarvester(Harvester):
         # check for an identical orm.ChannelEpoch
         try:
             cha_epoch = session.query(orm.ChannelEpoch).\
-                filter(orm.ChannelEpoch.channel == channel.code).\
+                filter(orm.ChannelEpoch.code == channel.code).\
                 filter(orm.ChannelEpoch.locationcode ==
                        channel.location_code).\
                 filter(orm.ChannelEpoch.starttime ==
@@ -719,7 +719,7 @@ class RoutingHarvester(Harvester):
 
         if cha_epoch is None:
             cha_epoch = orm.ChannelEpoch(
-                channel=channel.code,
+                code=channel.code,
                 locationcode=channel.location_code,
                 starttime=channel.start_date.datetime,
                 endtime=end_date,
@@ -916,13 +916,13 @@ class VNetHarvester(Harvester):
                     query = session.query(orm.ChannelEpoch).\
                         join(orm.Network).\
                         join(orm.Station).\
-                        filter(orm.Network.name.like(
+                        filter(orm.Network.code.like(
                                sql_stream_epoch.network)).\
-                        filter(orm.Station.name.like(
+                        filter(orm.Station.code.like(
                                sql_stream_epoch.station)).\
                         filter(orm.ChannelEpoch.locationcode.like(
                                sql_stream_epoch.location)).\
-                        filter(orm.ChannelEpoch.channel.like(
+                        filter(orm.ChannelEpoch.code.like(
                                sql_stream_epoch.channel)).\
                         filter((orm.ChannelEpoch.endtime == None) |  # noqa
                                (orm.ChannelEpoch.endtime >
@@ -961,14 +961,14 @@ class VNetHarvester(Harvester):
 
         try:
             vnet = session.query(orm.StreamEpochGroup).\
-                filter(orm.StreamEpochGroup.name == net_code).\
+                filter(orm.StreamEpochGroup.code == net_code).\
                 one_or_none()
         except MultipleResultsFound as err:
             raise self.IntegrityError(err)
 
         # check if network already available - else create a new one
         if vnet is None:
-            vnet = orm.StreamEpochGroup(name=net_code)
+            vnet = orm.StreamEpochGroup(code=net_code)
             self.logger.debug(
                 "Created new StreamEpochGroup object '{}'".format(vnet))
             session.add(vnet)
@@ -986,16 +986,16 @@ class VNetHarvester(Harvester):
         Factory method for a :code:`orm.StreamEpoch` object.
         """
         # check if overlapping with a StreamEpoch already existing
-        # XXX(damb)_ Overlapping orm.StreamEpoch objects regarding time
+        # XXX(damb): Overlapping orm.StreamEpoch objects regarding time
         # constraints are updated (i.e. implemented as: delete - insert).
         query = session.query(orm.StreamEpoch).\
             join(orm.Network).\
             join(orm.Station).\
-            filter(orm.Network.name == channel_epoch.network.name).\
-            filter(orm.Station.name == channel_epoch.station.name).\
+            filter(orm.Network.code == channel_epoch.network.code).\
+            filter(orm.Station.code == channel_epoch.station.code).\
             filter(orm.StreamEpoch.stream_epoch_group == vnet).\
             filter(orm.StreamEpoch.channel ==
-                   channel_epoch.channel).\
+                   channel_epoch.code).\
             filter(orm.StreamEpoch.location ==
                    channel_epoch.locationcode)
 
@@ -1030,10 +1030,10 @@ class VNetHarvester(Harvester):
             se = session.query(orm.StreamEpoch).\
                 join(orm.Network).\
                 join(orm.Station).\
-                filter(orm.Network.name == channel_epoch.network.name).\
-                filter(orm.Station.name == channel_epoch.station.name).\
+                filter(orm.Network.code == channel_epoch.network.code).\
+                filter(orm.Station.code == channel_epoch.station.code).\
                 filter(orm.StreamEpoch.stream_epoch_group == vnet).\
-                filter(orm.StreamEpoch.channel == channel_epoch.channel).\
+                filter(orm.StreamEpoch.channel == channel_epoch.code).\
                 filter(orm.StreamEpoch.location ==
                        channel_epoch.locationcode).\
                 filter(orm.StreamEpoch.starttime == stream_epoch.starttime).\
@@ -1044,7 +1044,7 @@ class VNetHarvester(Harvester):
 
         if se is None:
             se = orm.StreamEpoch(
-                channel=channel_epoch.channel,
+                channel=channel_epoch.code,
                 location=channel_epoch.locationcode,
                 starttime=stream_epoch.starttime,
                 endtime=stream_epoch.endtime,

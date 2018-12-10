@@ -57,6 +57,15 @@ class Base(object):
 # class Base
 
 
+class CodeMixin(object):
+
+    @declared_attr
+    def code(cls):
+        return Column(String(LENGTH_STD_CODE), nullable=False, index=True)
+
+# class CodeMixin
+
+
 class EpochMixin(object):
 
     @declared_attr
@@ -94,9 +103,7 @@ class RestrictedStatusMixin(object):
 ORMBase = declarative_base(cls=Base)
 
 
-class Network(ORMBase):
-
-    name = Column(String(LENGTH_STD_CODE), nullable=False, index=True)
+class Network(CodeMixin, ORMBase):
 
     network_epochs = relationship('NetworkEpoch', back_populates='network')
     channel_epochs = relationship('ChannelEpoch',
@@ -104,7 +111,7 @@ class Network(ORMBase):
     stream_epochs = relationship('StreamEpoch', back_populates='network')
 
     def __repr__(self):
-        return '<Network(code=%s)>' % self.name
+        return '<Network(code=%s)>' % self.code
 
 # class Network
 
@@ -120,14 +127,13 @@ class NetworkEpoch(EpochMixin, LastSeenMixin, RestrictedStatusMixin, ORMBase):
 # class NetworkEpoch
 
 
-class ChannelEpoch(EpochMixin, LastSeenMixin, RestrictedStatusMixin, ORMBase):
+class ChannelEpoch(CodeMixin, EpochMixin, LastSeenMixin, RestrictedStatusMixin,
+                   ORMBase):
 
     network_ref = Column(Integer, ForeignKey('network.oid'),
                          index=True)
     station_ref = Column(Integer, ForeignKey('station.oid'),
                          index=True)
-    channel = Column(String(LENGTH_CHANNEL_CODE), nullable=False,
-                     index=True)
     locationcode = Column(String(LENGTH_LOCATION_CODE), nullable=False,
                           index=True)
 
@@ -142,15 +148,13 @@ class ChannelEpoch(EpochMixin, LastSeenMixin, RestrictedStatusMixin, ORMBase):
     def __repr__(self):
         return ('<ChannelEpoch(network=%r, station=%r, channel=%r, '
                 'location=%r, starttime=%r, endtime=%r)>' %
-                (self.network, self.station, self.channel,
+                (self.network, self.station, self.code,
                  self.locationcode, self.starttime, self.endtime))
 
 # class ChannelEpoch
 
 
-class Station(ORMBase):
-
-    name = Column(String(LENGTH_STD_CODE), nullable=False, index=True)
+class Station(CodeMixin, ORMBase):
 
     station_epochs = relationship('StationEpoch', back_populates='station')
 
@@ -158,7 +162,7 @@ class Station(ORMBase):
     stream_epochs = relationship('StreamEpoch', back_populates='station')
 
     def __repr__(self):
-        return '<Station(code=%s)>' % self.name
+        return '<Station(code=%s)>' % self.code
 
 # class Station
 
@@ -222,15 +226,13 @@ class Service(ORMBase):
 # class Service
 
 
-class StreamEpochGroup(ORMBase):
-
-    name = Column(String(LENGTH_STD_CODE), nullable=False, unique=True)
+class StreamEpochGroup(CodeMixin, ORMBase):
 
     stream_epochs = relationship('StreamEpoch',
                                  back_populates='stream_epoch_group')
 
     def __repr__(self):
-        return '<StreamEpochGroup(code=%s)>' % self.name
+        return '<StreamEpochGroup(code=%s)>' % self.code
 
 # class StreamEpochGroup
 
