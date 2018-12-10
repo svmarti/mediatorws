@@ -146,12 +146,14 @@ class AuthDataselectResource(Resource):
         self.logger.debug('DataselectSchema (serialized): %s' % args)
 
         # process request
-        return RequestProcessor.create(args['service'],
-                                       auth=auth,
-                                       query_params=args,
-                                       stream_epochs=stream_epochs,
-                                       post=False,
-                                       default_endtime=g.request_start_time).streamed_response
+        return RequestProcessor.create(
+            args['service'],
+            auth=auth,
+            query_params=args,
+            stream_epochs=stream_epochs,
+            post=False,
+            default_endtime=g.request_start_time).streamed_response
+
     # get ()
 
     @fdsnws.use_fdsnws_args(DataselectSchema(), locations=('form',))

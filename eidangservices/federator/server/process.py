@@ -137,7 +137,8 @@ class RequestProcessor(object):
 
         self.mimetype = kwargs.get('mimetype', self.MIMETYPE)
         if not self.mimetype:
-            raise TypeError('Invalid mimetype value: {!r}'.format(self.mimetype))
+            raise TypeError(
+                'Invalid mimetype value: {!r}'.format(self.mimetype))
 
         self.content_type = (
             '{}; {}'.format(self.mimetype, settings.CHARSET_TEXT)
@@ -994,7 +995,8 @@ class AuthDataselectRequestProcessor(AuthMixin, DataselectRequestProcessor):
 
     CHUNK_SIZE = 1024
 
-    def __init__(self, auth, query_params={}, stream_epochs=[], post=True, **kwargs):
+    def __init__(self, auth, query_params={}, stream_epochs=[], post=True,
+                 **kwargs):
         super().__init__(auth=auth, query_params=query_params,
                          stream_epochs=stream_epochs, post=post, **kwargs)
 
