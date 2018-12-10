@@ -49,7 +49,7 @@ from eidangservices.federator.server.routes.misc import (
     WFCatalogVersionResource, DataselectWadlResource,
     StationWadlResource, WFCatalogWadlResource)
 from eidangservices.federator.server.routes.dataselect import \
-    DataselectResource
+    DataselectResource, AuthDataselectResource
 from eidangservices.federator.server.routes.station import StationResource
 from eidangservices.federator.server.routes.wfcatalog import WFCatalogResource
 from eidangservices.utils.app import CustomParser, App, AppError
@@ -219,6 +219,9 @@ class FederatorWebservice(App):
                               settings.FDSN_QUERY_METHOD_TOKEN))
 
             # queryauth method
+            api.add_resource(AuthDataselectResource, "%s%s" %
+                             (settings.FDSN_DATASELECT_PATH,
+                              settings.FDSN_QUERYAUTH_METHOD_TOKEN))
 
             # version method
             api.add_resource(DataselectVersionResource, "%s%s" %

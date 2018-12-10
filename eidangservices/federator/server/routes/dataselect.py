@@ -5,6 +5,7 @@
 # This file is part of EIDA NG webservices (eida-federator).
 #
 # eida-federator is free software: you can redistribute it and/or modify
+
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
@@ -35,7 +36,7 @@ from builtins import * # noqa
 
 import logging
 
-from flask import request
+from flask import request, g
 from flask_restful import Resource
 from webargs.flaskparser import use_args
 
@@ -113,6 +114,78 @@ class DataselectResource(Resource):
     # post ()
 
 # class DataselectResource
+
+
+class AuthDataselectResource(Resource):
+    """
+    Resource handler for dataselect service requiring authentication.
+    """
+    LOGGER = 'flask.app.federator.restricted_dataselect_resource'
+
+    def __init__(self):
+        super().__init__()
+        self.logger = logging.getLogger(self.LOGGER)
+
+    @use_args(DataselectSchema(), locations=('query',))
+    @fdsnws.use_fdsnws_kwargs(
+        ManyStreamEpochSchema(context={'request': request}),
+        locations=('query',)
+    )
+    @with_strict_args(
+        (DataselectSchema, StreamEpochSchema),
+        locations=('query',)
+    )
+    @fdsnws.with_fdsnws_exception_handling(__version__)
+    def get(self, args, stream_epochs, auth):
+        # request.method == 'GET'
+        self.logger.debug('StreamEpoch objects: %s' % stream_epochs)
+
+        # serialize objects
+        s = DataselectSchema()
+        args = s.dump(args)
+        self.logger.debug('DataselectSchema (serialized): %s' % args)
+
+        # process request
+        return RequestProcessor.create(args['service'],
+                                       auth=auth,
+                                       query_params=args,
+                                       stream_epochs=stream_epochs,
+                                       post=False,
+                                       default_endtime=g.request_start_time).streamed_response
+    # get ()
+
+    @fdsnws.use_fdsnws_args(DataselectSchema(), locations=('form',))
+    @fdsnws.use_fdsnws_kwargs(
+        ManyStreamEpochSchema(context={'request': request}),
+        locations=('form',)
+    )
+    @with_strict_args(
+        DataselectSchema,
+        locations=('form',)
+    )
+    @fdsnws.with_fdsnws_exception_handling(__version__)
+    def post(self, args, stream_epochs, auth):
+        # request.method == 'POST'
+        # NOTE(fab): must be sent as binary to preserve line breaks
+        # curl: --data-binary @postfile --header "Content-Type:text/plain"
+        self.logger.debug('StreamEpoch objects: %s' % stream_epochs)
+
+        s = DataselectSchema()
+        args = s.dump(args)
+        self.logger.debug('DataselectSchema (serialized): %s' % args)
+
+        # process request
+        return RequestProcessor.create(
+            args['service'],
+            auth=auth,
+            query_params=args,
+            stream_epochs=stream_epochs,
+            post=True,
+            default_endtime=g.request_start_time).streamed_response
+
+    # post ()
+
+# class AuthDataselectResource
 
 
 # ---- END OF <dataselect.py> ----
