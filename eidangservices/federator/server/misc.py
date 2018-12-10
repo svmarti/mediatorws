@@ -31,9 +31,17 @@ from __future__ import (absolute_import, division, print_function,
 
 from builtins import * # noqa
 
+import logging
 import os
 import random
 import tempfile
+
+from eidangservices import settings, utils
+from eidangservices.federator import __version__
+from eidangservices.utils.httperrors import FDSNHTTPError
+from eidangservices.utils.request import (binary_request, RequestsError,
+                                          NoContent)
+from eidangservices.utils.sncl import StreamEpoch
 
 
 def get_temp_filepath():
@@ -98,5 +106,64 @@ def elements_equal(e, e_other, exclude_tags=[], recursive=True):
                for c, c_other in zip(local_e, local_e_other))
 
 # elements_equal ()
+
+def route(req, default_endtime=None,
+          nodata=settings.FDSN_DEFAULT_NO_CONTENT_ERROR_CODE):
+    """
+    Create the routing table.
+
+    :param req: Request object for the routing service used
+    :type req: :py:class:`requests.Request`
+    :param default_endtime: Default endtime to be used if the routing service
+        returns an empty value
+    :type default_endtime: None or :py:class:`datetime.datetime`
+    :param int nodata: HTTP status code used during exception handling if the
+        routing service returns no data
+    """
+    logger = logging.getLogger('flask.app.federator.misc')
+
+    routing_table = []
+
+    try:
+        with binary_request(req) as fd:
+            # parse the routing service's output stream; create a routing
+            # table
+            urlline = None
+            stream_epochs = []
+
+            while True:
+                line = fd.readline()
+
+                if not urlline:
+                    urlline = line.strip()
+                elif not line.strip():
+                    # set up the routing table
+                    if stream_epochs:
+                        routing_table.append(
+                            utils.Route(url=urlline,
+                                        streams=stream_epochs))
+                    urlline = None
+                    stream_epochs = []
+
+                    if not line:
+                        break
+                else:
+                    stream_epochs.append(
+                        StreamEpoch.from_snclline(
+                            line, default_endtime))
+
+    except NoContent as err:
+        logger.warning(err)
+        raise FDSNHTTPError.create(nodata)
+    except RequestsError as err:
+        logger.error(err)
+        raise FDSNHTTPError.create(500, service_version=__version__)
+    else:
+        logger.debug(
+            'Number of routes received: {}'.format(len(routing_table)))
+
+    return routing_table
+
+# route ()
 
 # ---- END OF <misc.py> ----

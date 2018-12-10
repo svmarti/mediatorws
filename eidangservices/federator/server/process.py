@@ -43,6 +43,9 @@ from flask import current_app, stream_with_context, Response
 
 from eidangservices import utils, settings
 from eidangservices.federator import __version__
+from eidangservices.federator.server.auth import AuthMixin
+from eidangservices.federator.server.misc import (
+    route as route_with_stationlite)
 from eidangservices.federator.server.request import (
     RoutingRequestHandler, GranularFdsnRequestHandler)
 from eidangservices.federator.server.task import (
@@ -50,9 +53,6 @@ from eidangservices.federator.server.task import (
     StationXMLNetworkCombinerTask, WFCatalogSplitAndAlignTask)
 from eidangservices.utils.error import ErrorWithTraceback
 from eidangservices.utils.httperrors import FDSNHTTPError
-from eidangservices.utils.request import (binary_request, RequestsError,
-                                          NoContent)
-from eidangservices.utils.sncl import StreamEpoch
 
 
 # TODO(damb): This is a note regarding the federator-registered mode.
@@ -61,7 +61,7 @@ from eidangservices.utils.sncl import StreamEpoch
 # corresponding combiner tasks.
 
 def demux_routes(routes):
-    return [utils.Route(url=route.url, streams=[se], auth=route.auth)
+    return [utils.Route(url=route.url, streams=[se])
             for route in routes for se in route.streams]
 
 # demux_routes ()
@@ -116,6 +116,10 @@ class StreamingError(RequestProcessorError):
 class RequestProcessor(object):
     """
     Abstract base class for request processors.
+
+    :param default_endtime: Datetime to be used for stream epochs not shipping
+        any endtime
+    :type default_endtime: :py:class:`datetime.datetime`
     """
 
     LOGGER = "flask.app.federator.request_processor"
@@ -139,34 +143,45 @@ class RequestProcessor(object):
             '{}; {}'.format(self.mimetype, settings.CHARSET_TEXT)
             if self.mimetype == settings.MIMETYPE_TEXT else self.mimetype)
 
-        self.logger = logging.getLogger(
-            self.LOGGER if kwargs.get('logger') is None
-            else kwargs.get('logger'))
+        self._routing_service = current_app.config['ROUTING_SERVICE']
 
+        self.logger = logging.getLogger(kwargs.get('logger', self.LOGGER))
+        self._default_endtime = kwargs.get('default_endtime',
+                                           datetime.datetime.utcnow())
         self._pool = None
         self._results = []
         self._sizes = []
 
-        self._default_endtime = datetime.datetime.utcnow()
+        self._datetime_init = datetime.datetime.utcnow()
 
     # __init__ ()
 
     @staticmethod
     def create(service, *args, **kwargs):
-        """Factory method for RequestProcessor object instances.
+        """
+        Factory method for :py:class:`RequestProcessor` object instances.
 
-        :param str service: Service identifier.
-        :param dict kwargs: A dictionary passed to the combiner constructors.
+        :param str service: Service identifier
+        :param auth: Emerge a request processor specified by
+            :code:`service` providing access to *restricted* data
+        :type auth: None or a subcalss of :py:class:`requests.auth.AuthBase`
+        :param kwargs: Additional keyword value parameters passed to the
+            processor's constructor
+
         :return: A concrete :py:class:`RequestProcessor` implementation
         :rtype: :py:class:`RequestProcessor`
         :raises KeyError: if an invalid format string was passed
         """
-        if service == 'dataselect':
+        auth = kwargs.get('auth')
+
+        if service == 'dataselect' and auth is None:
             return DataselectRequestProcessor(*args, **kwargs)
-        elif service == 'station':
+        elif service == 'dataselect' and auth:
+            return AuthDataselectRequestProcessor(auth, *args, **kwargs)
+        elif service == 'station' and auth is None:
             return StationRequestProcessor.create(
                 kwargs['query_params'].get('format', 'xml'), *args, **kwargs)
-        elif service == 'wfcatalog':
+        elif service == 'wfcatalog' and auth is None:
             return WFCatalogRequestProcessor(*args, **kwargs)
         else:
             raise KeyError('Invalid RequestProcessor chosen.')
@@ -174,8 +189,8 @@ class RequestProcessor(object):
     # create ()
 
     @property
-    def DEFAULT_ENDTIME(self):
-        return self._default_endtime
+    def DATETIME_INIT(self):
+        return self._datetime_init
 
     @property
     def streamed_response(self):
@@ -199,61 +214,27 @@ class RequestProcessor(object):
 
     # streamed_response ()
 
-    def _route(self):
+    def _route(self, default_endtime):
         """
         Create the routing table using the routing service provided.
+
+        :param default_endtime: Endtime to be used if stream epochs do not ship
+            one
+        :type default_endtime: :py:class:`datetime.datetime`
         """
         routing_request = RoutingRequestHandler(
             self._routing_service, self.query_params,
             self.stream_epochs)
 
-        req = (routing_request.post() if self.post else routing_request.get())
-        self.logger.info("Fetching routes from %s" % routing_request.url)
+        self.logger.info(
+            "Fetching routes from {!r}".format(routing_request.url))
 
-        routing_table = []
-
-        try:
-            with binary_request(req) as fd:
-                # parse the routing service's output stream; create a routing
-                # table
-                urlline = None
-                stream_epochs = []
-
-                while True:
-                    line = fd.readline()
-
-                    if not urlline:
-                        urlline = line.strip()
-                    elif not line.strip():
-                        # set up the routing table
-                        if stream_epochs:
-                            routing_table.append(
-                                utils.Route(url=urlline,
-                                            streams=stream_epochs))
-                        urlline = None
-                        stream_epochs = []
-
-                        if not line:
-                            break
-                    else:
-                        stream_epochs.append(
-                            StreamEpoch.from_snclline(
-                                line, default_endtime=self.DEFAULT_ENDTIME))
-
-        except NoContent as err:
-            self.logger.warning(err)
-            raise FDSNHTTPError.create(
-                int(self.query_params.get(
-                    'nodata',
-                    settings.FDSN_DEFAULT_NO_CONTENT_ERROR_CODE)))
-        except RequestsError as err:
-            self.logger.error(err)
-            raise FDSNHTTPError.create(500, service_version=__version__)
-        else:
-            self.logger.debug(
-                'Number of routes received: {}'.format(len(routing_table)))
-
-        return routing_table
+        return route_with_stationlite(
+            (routing_request.post() if self.post else routing_request.get()),
+            default_endtime=default_endtime,
+            nodata=int(self.query_params.get(
+                'nodata',
+                settings.FDSN_DEFAULT_NO_CONTENT_ERROR_CODE)))
 
     # _route ()
 
@@ -316,7 +297,7 @@ class RequestProcessor(object):
                 break
 
             if (not self._results or datetime.datetime.utcnow() >
-                self.DEFAULT_ENDTIME +
+                self.DATETIME_INIT +
                     datetime.timedelta(seconds=timeout)):
                 self.logger.warning(
                     'No valid results to be federated. ({})'.format(
@@ -369,7 +350,8 @@ class DataselectRequestProcessor(RequestProcessor):
     Federating request processor implementation for :code:`fdsnws-dataselect`.
     Controls both the federated downloading process and the merging of the
     `miniSEED http://ds.iris.edu/ds/nodes/dmc/data/formats/miniseed/` data,
-    afterwards.
+    afterwards. Note, that this type of request processor does not handle
+    access to *restricted* data.
 
     Handles HTTP status code **413** from endpoints by splitting a
     stream epoch into smaller chunks and merging those chunks appropriately.
@@ -384,11 +366,36 @@ class DataselectRequestProcessor(RequestProcessor):
     def POOL_SIZE(self):
         return current_app.config['FED_THREAD_CONFIG']['fdsnws-dataselect']
 
+    def _route(self, default_endtime):
+        """
+        Create the routing table using the routing service provided.
+
+        :param default_endtime: Endtime to be used if stream epochs do not ship
+            one
+        :type default_endtime: :py:class:`datetime.datetime`
+        """
+        routing_request = RoutingRequestHandler(
+            self._routing_service, self.query_params,
+            self.stream_epochs, access='open')
+
+        self.logger.info(
+            "Fetching routes from {!r}".format(routing_request.url))
+
+        return route_with_stationlite(
+            (routing_request.post() if self.post else routing_request.get()),
+            default_endtime=default_endtime,
+            nodata=int(self.query_params.get(
+                'nodata',
+                settings.FDSN_DEFAULT_NO_CONTENT_ERROR_CODE)))
+
+    # _route ()
+
     def _request(self):
         """
         Request data from :code:`fdsnws-dataselect` endpoints.
         """
-        routes = demux_routes(self._route())
+        routes = demux_routes(
+            self._route(default_endtime=self._default_endtime))
 
         pool_size = (len(routes) if
                      len(routes) < self.POOL_SIZE else self.POOL_SIZE)
@@ -425,8 +432,9 @@ class DataselectRequestProcessor(RequestProcessor):
                                            result.data.stream_epochs))
         t = RawSplitAndAlignTask(
             result.data.url, result.data.stream_epochs[0],
+            auth=result.data.auth,
             query_params=self.query_params,
-            endtime=self.DEFAULT_ENDTIME)
+            endtime=self._default_endtime)
 
         result = self._pool.apply_async(t)
         self._results.append(result)
@@ -544,8 +552,9 @@ class StationRequestProcessor(RequestProcessor):
 
     # create ()
 
-    def _route(self):
-        return group_routes_by(super()._route(), key='network')
+    def _route(self, default_endtime):
+        return group_routes_by(
+            super()._route(default_endtime=default_endtime), key='network')
 
     # _route ()
 
@@ -589,7 +598,7 @@ class StationXMLRequestProcessor(StationRequestProcessor):
         Request data from :code:`fdsnws-station` endpoints with
         :code:`format=xml`.
         """
-        routes = self._route()
+        routes = self._route(default_endtime=self._default_endtime)
 
         pool_size = (len(routes) if
                      len(routes) < self.POOL_SIZE else self.POOL_SIZE)
@@ -712,7 +721,8 @@ class StationTextRequestProcessor(StationRequestProcessor):
         Request data from :code:`fdsnws-station` endpoints with
         :code:`format=text`.
         """
-        routes = flatten_routes(self._route())
+        routes = flatten_routes(
+            self._route(default_endtime=self._default_endtime))
 
         pool_size = (len(routes) if
                      len(routes) < self.POOL_SIZE else self.POOL_SIZE)
@@ -824,7 +834,8 @@ class WFCatalogRequestProcessor(RequestProcessor):
         """
         Request data from :code:`eidaws-wfcatalog` endpoints.
         """
-        routes = demux_routes(self._route())
+        routes = demux_routes(
+            self._route(default_endtime=self._default_endtime))
 
         pool_size = (len(routes) if
                      len(routes) < self.POOL_SIZE else self.POOL_SIZE)
@@ -862,7 +873,7 @@ class WFCatalogRequestProcessor(RequestProcessor):
         t = WFCatalogSplitAndAlignTask(
             result.data.url, result.data.stream_epochs[0],
             query_params=self.query_params,
-            endtime=self.DEFAULT_ENDTIME)
+            endtime=self._default_endtime)
 
         result = self._pool.apply_async(t)
         self._results.append(result)
@@ -960,6 +971,117 @@ class WFCatalogRequestProcessor(RequestProcessor):
     # __iter__ ()
 
 # class WFCatalogRequestProcessor
+
+
+class AuthDataselectRequestProcessor(AuthMixin, DataselectRequestProcessor):
+    """
+    Federating request processor implementation for :code:`fdsnws-dataselect`
+    allowing access to *restricted* data, too.
+
+    Controls authentication at endpoints including both the federated
+    downloading process and the merging of the `miniSEED
+    http://ds.iris.edu/ds/nodes/dmc/data/formats/miniseed/` data, afterwards.
+
+    Handles HTTP status code **413** from endpoints by splitting a
+    stream epoch into smaller chunks and merging those chunks appropriately.
+
+    :param default_endtime: Endtime to be used if stream epochs do not ship
+        one
+    :type default_endtime: :py:class:`datetime.datetime`
+    """
+
+    LOGGER = "flask.app.federator.auth_request_processor_dataselect"
+
+    CHUNK_SIZE = 1024
+
+    def __init__(self, auth, query_params={}, stream_epochs=[], post=True, **kwargs):
+        super().__init__(auth=auth, query_params=query_params,
+                         stream_epochs=stream_epochs, post=post, **kwargs)
+
+    # __init__ ()
+
+    def _request(self):
+        """
+        Request both *open* and *restricted* data from
+        :code:`fdsnws-dataselect` endpoints. Note, that firstly the *open* data
+        is requested. The *restricted* data is requested, afterwards (After the
+        authentication procedure).
+        """
+        routes_closed, routes_open = self._route(
+            default_endtime=self._default_endtime)
+
+        routes_open = demux_routes(routes_open)
+        routes_closed = self.demux_routes(routes_closed)
+
+        pool_size = min(max(len(routes_open), len(routes_closed)),
+                        self.POOL_SIZE)
+
+        self.logger.debug('Init worker pool (size={}).'.format(pool_size))
+        self._pool = mp.pool.ThreadPool(processes=pool_size)
+        # NOTE(damb): With pleasure I'd like to define the parameter
+        # maxtasksperchild=self.MAX_TASKS_PER_CHILD)
+        # However, using this parameter seems to lead to processes unexpectedly
+        # terminated. Hence some tasks never return a *ready* result.
+
+        # request *open* data
+        for route in routes_open:
+            self.logger.debug(
+                'Creating DownloadTask for {!r} ...'.format(
+                    route))
+            t = RawDownloadTask(
+                GranularFdsnRequestHandler(
+                    route.url,
+                    route.streams[0],
+                    query_params=self.query_params))
+            result = self._pool.apply_async(t)
+            self._results.append(result)
+
+        # proceed with authentication for restricted routes
+        routes_closed = self._auth(routes_closed)
+
+        # request *restricted* data
+        for route in routes_closed:
+            self.logger.debug(
+                'Creating DownloadTask for {!r} ...'.format(
+                    route))
+            t = RawDownloadTask(
+                GranularFdsnRequestHandler(
+                    route.url,
+                    route.streams[0],
+                    auth=route.auth,
+                    query_params=self.query_params))
+            result = self._pool.apply_async(t)
+            self._results.append(result)
+
+    # _request ()
+
+    def _handle_413(self, result):
+        self.logger.info(
+            'Handle endpoint HTTP status code 413 (url={}, '
+            'stream_epochs={}).'.format(result.data.url,
+                                        result.data.stream_epochs))
+        self.logger.debug(
+            'Creating SAATask for (url={}, '
+            'stream_epochs={}) ...'.format(result.data.url,
+                                           result.data.stream_epochs))
+
+        try:
+            auth = result.data.auth
+        except AttributeError:
+            auth = None
+
+        t = RawSplitAndAlignTask(
+            result.data.url, result.data.stream_epochs[0],
+            auth=auth,
+            query_params=self.query_params,
+            endtime=self._default_endtime)
+
+        result = self._pool.apply_async(t)
+        self._results.append(result)
+
+    # _handle_413 ()
+
+# class AuthDataselectRequestProcessor
 
 
 # ---- END OF <process.py> ----
