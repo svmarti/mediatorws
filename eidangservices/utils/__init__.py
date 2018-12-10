@@ -72,6 +72,28 @@ Container for routes.
     :py:mod:`eidangservices.utils.sncl` module).
 """
 
+class AuthRoute(collections.namedtuple('AuthRoute',
+                                       Route._fields + ('auth',))):
+    """
+    Container for routes.
+
+    :param str url: URL
+    :param list streams: List of stream epoch like objects (see
+        :py:mod:`eidangservices.utils.sncl` module).
+    :param auth: Authentication object used for :code:`url`
+    :type auth: None or :py:class:`requests.auth.AuthBase`
+    """
+    __slots__ = ()
+
+    def __new__(cls, url, streams, auth=None):
+        return super().__new__(cls, url=url, streams=streams, auth=auth)
+
+    @classmethod
+    def from_route(cls, route):
+        return cls(url=route.url, streams=route.streams)
+
+# class AuthRoute
+
 
 # -----------------------------------------------------------------------------
 def realpath(p):
