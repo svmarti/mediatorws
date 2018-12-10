@@ -123,13 +123,16 @@ class RequestHandlerBase(object):
 
 class RoutingRequestHandler(RequestHandlerBase):
     """
-    Representation of a `eidaws-routing` request handler.
+    Implementation of a *StationLite* request handler.
 
-    .. note::
-
-        Since both `eidaws-routing` and `eida-stationlite` implement the same
-        interface :py:class:`RoutingRequestHandler` may be used for both
-        webservices.
+    :param str url: URL of the *StationLite* webservice
+    :param dict query_params: Dictionary of query parameters from which the
+        query parameters actually relevant for *StationLite* are extracted
+        from
+    :param list stream_epochs: List of :py:class`StreamEpoch` objects to be
+        requested from the *StationLite* webservice
+    :param str access: Specifies the :code:`access` query parameter when
+        requesting data from *StationLite*
     """
     QUERY_PARAMS = set(('service',
                         'level',
@@ -146,13 +149,15 @@ class RoutingRequestHandler(RequestHandlerBase):
 
     # class GET
 
-    def __init__(self, url, query_params={}, stream_epochs=[]):
+    def __init__(self, url, query_params={}, stream_epochs=[], access=None):
         super().__init__(url, query_params, stream_epochs)
 
         self._query_params = dict(
             (p, v) for p, v in self._query_params.items()
             if p in self.QUERY_PARAMS)
 
+        if access is not None:
+            self._query_params['access'] = access
         self._query_params['format'] = 'post'
 
     # __init__ ()
@@ -200,8 +205,8 @@ class GranularFdsnRequestHandler(RequestHandlerBase):
                         'minlongitude', 'minlon',
                         'maxlongitude', 'maxlon'))
 
-    def __init__(self, url, stream_epoch, query_params={}):
-        super().__init__(url, query_params, [stream_epoch])
+    def __init__(self, url, stream_epoch, query_params={}, auth=None):
+        super().__init__(url, query_params, [stream_epoch], auth=auth)
         self._query_params = dict((p, v)
                                   for p, v in self._query_params.items()
                                   if p not in self.QUERY_PARAMS)
