@@ -61,7 +61,7 @@ class RequestHandlerBase(object):
                # handle this
                "Accept-Encoding": ""}
 
-    def __init__(self, url, query_params={}, stream_epochs=[]):
+    def __init__(self, url, query_params={}, stream_epochs=[], auth=None):
         if isinstance(url, bytes):
             url = url.decode('utf-8')
         url = urlparse(url)
@@ -72,6 +72,8 @@ class RequestHandlerBase(object):
 
         self._query_params = query_params
         self._stream_epochs = stream_epochs
+
+        self._auth = auth
 
     # __init__ ()
 
@@ -90,6 +92,10 @@ class RequestHandlerBase(object):
         return self._stream_epochs
 
     @property
+    def auth(self):
+        return self._auth
+
+    @property
     def payload_get(self):
         raise NotImplementedError
 
@@ -106,7 +112,8 @@ class RequestHandlerBase(object):
         raise NotImplementedError
 
     def post(self):
-        return [functools.partial(requests.post, self.url, data=p)
+        return [functools.partial(requests.post, self.url, data=p,
+                                  auth=self.auth)
                 for p in self.payload_post]
 
     def __str__(self):
@@ -219,7 +226,7 @@ class GranularFdsnRequestHandler(RequestHandlerBase):
         return '{}\n{}'.format(data, self.stream_epochs[0])
 
     def post(self):
-        return functools.partial(requests.post, self.url,
+        return functools.partial(requests.post, self.url, auth=self.auth,
                                  data=self.payload_post, headers=self.HEADERS)
 
 # class GranularFdsnRequestHandler
