@@ -519,12 +519,14 @@ class SplitAndAlignTask(TaskBase):
 
     DEFAULT_SPLITTING_CONST = 2
 
-    def __init__(self, url, stream_epoch, query_params, **kwargs):
+    def __init__(self, url, stream_epoch, query_params, auth=None, **kwargs):
         super().__init__(self.LOGGER)
         self.query_params = query_params
         self.path_tempfile = get_temp_filepath()
         self._url = url
         self._stream_epoch_orig = stream_epoch
+        self._auth = auth
+
         self._endtime = kwargs.get('endtime', datetime.datetime.utcnow())
 
         self._splitting_const = self.DEFAULT_SPLITTING_CONST
@@ -602,7 +604,8 @@ class RawSplitAndAlignTask(SplitAndAlignTask):
         # make a request for the first stream epoch
         for stream_epoch in stream_epochs:
             request_handler = GranularFdsnRequestHandler(
-                self._url, stream_epoch, query_params=self.query_params)
+                self._url, stream_epoch, query_params=self.query_params,
+                auth=self._auth)
 
             last_chunk = None
             try:
@@ -669,7 +672,8 @@ class WFCatalogSplitAndAlignTask(SplitAndAlignTask):
     JSON_LIST_SEP = b','
 
     def __init__(self, url, stream_epoch, query_params, **kwargs):
-        super().__init__(url, stream_epoch, query_params, **kwargs)
+        super().__init__(url, stream_epoch, query_params, auth=None,
+                         **kwargs)
         self._last_obj = None
 
     def _run(self, stream_epoch):
