@@ -227,23 +227,29 @@ class StreamEpochSchema(Schema):
 
             starttime = data.get('starttime')
             endtime = data.get('endtime')
+            now = datetime.datetime.utcnow()
 
             if self.context.get('request').method == 'GET':
-                if not endtime:
-                    endtime = datetime.datetime.utcnow()
 
-                # reset endtime silently if in future
-                if endtime > datetime.datetime.utcnow():
-                    endtime = datetime.datetime.utcnow()
-                    data['endtime'] = endtime
+                if not endtime:
+                    endtime = now
+                elif endtime > now:
+                    endtime = now
+                    if self.context.get('service') != 'eidaws-wfcatalog':
+                        data['endtime'] = None
 
             elif self.context.get('request').method == 'POST':
                 if starttime is None or endtime is None:
                     raise ValidationError('missing temporal constraints')
 
-            if starttime and starttime >= endtime:
-                raise ValidationError(
-                    'endtime must be greater than starttime')
+            if starttime:
+                if starttime > now:
+                    raise ValidationError('starttime in future')
+                elif starttime >= endtime:
+                    raise ValidationError(
+                        'endtime must be greater than starttime')
+
+    # validate_temporal_constraints ()
 
     class Meta:
         strict = True

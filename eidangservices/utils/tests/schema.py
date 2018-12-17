@@ -456,6 +456,20 @@ class StreamEpochSchemaTestCase(unittest.TestCase):
             test_dataset = self._load(s, test_dataset)
 
     @mock.patch('flask.Request')
+    def test_sncl_get_start_future_wfcatalog(self, mock_request):
+        # request.method == 'GET'
+        mock_request.method = 'GET'
+        s = schema.StreamEpochSchema(context={'request': mock_request,
+                                              'service': 'eidaws-wfcatalog'})
+
+        # define starttime in future
+        future = datetime.datetime.now() + datetime.timedelta(1)
+        future = future.isoformat()
+        test_dataset = {'net': 'CH', 'sta': 'DAVOX', 'start': future}
+        with self.assertRaises(ma.ValidationError):
+            test_dataset = self._load(s, test_dataset)
+
+    @mock.patch('flask.Request')
     def test_sncl_get_end_future(self, mock_request):
         # request.method == 'GET'
         mock_request.method = 'GET'
@@ -467,16 +481,47 @@ class StreamEpochSchemaTestCase(unittest.TestCase):
         tomorrow_str = tomorrow.isoformat()
 
         test_dataset = {'net': 'CH', 'sta': 'DAVOX',
+                        'start': now.isoformat(),
                         'end': tomorrow_str}
         result = self._load(s, test_dataset)
-        self.assertAlmostEqual(result.endtime, now,
-                               delta=datetime.timedelta(seconds=1))
+        self.assertEqual(result.endtime, None)
+
+    @mock.patch('flask.Request')
+    def test_sncl_get_end_future_wfcatalog(self, mock_request):
+        # request.method == 'GET'
+        mock_request.method = 'GET'
+        s = schema.StreamEpochSchema(context={'request': mock_request,
+                                              'service': 'eidaws-wfcatalog'})
+
+        # define endtime in future
+        now = datetime.datetime.utcnow()
+        tomorrow = now + datetime.timedelta(1)
+        tomorrow_str = tomorrow.isoformat()
+
+        test_dataset = {'net': 'CH', 'sta': 'DAVOX',
+                        'start': now.isoformat(),
+                        'end': tomorrow_str}
+        result = self._load(s, test_dataset)
+        self.assertEqual(result.endtime, tomorrow)
 
     @mock.patch('flask.Request')
     def test_sncl_get_end_lt_start(self, mock_request):
         # request.method == 'GET'
         mock_request.method = 'GET'
         s = schema.StreamEpochSchema(context={'request': mock_request})
+
+        # define endtime <= starttime
+        test_dataset = {'net': 'CH', 'sta': 'DAVOX', 'end': '2017-01-01',
+                        'start': '2017-02-01'}
+        with self.assertRaises(ma.ValidationError):
+            test_dataset = self._load(s, test_dataset)
+
+    @mock.patch('flask.Request')
+    def test_sncl_get_end_lt_start_wfcatalog(self, mock_request):
+        # request.method == 'GET'
+        mock_request.method = 'GET'
+        s = schema.StreamEpochSchema(context={'request': mock_request,
+                                              'service': 'eidaws-wfcatalog'})
 
         # define endtime <= starttime
         test_dataset = {'net': 'CH', 'sta': 'DAVOX', 'end': '2017-01-01',
@@ -545,16 +590,12 @@ class StreamEpochSchemaTestCase(unittest.TestCase):
         mock_request.method = 'POST'
         s = schema.StreamEpochSchema(context={'request': mock_request})
 
-        # both starttime and endtime in future (not caught)
+        # both starttime and endtime in future
         today = datetime.datetime.now()
         tomorrow = today + datetime.timedelta(1)
         tomorrow_str = tomorrow.isoformat()
         dat = today + datetime.timedelta(2)
         dat_str = dat.isoformat()
-        reference_result = sncl.StreamEpoch(
-            stream=sncl.Stream(network='CH', station='DAVOX'),
-            starttime=tomorrow,
-            endtime=dat)
 
         test_dataset = {'net': 'CH',
                         'sta': 'DAVOX',
@@ -562,8 +603,8 @@ class StreamEpochSchemaTestCase(unittest.TestCase):
                         'cha': '*',
                         'start': tomorrow_str,
                         'end': dat_str}
-        result = self._load(s, test_dataset)
-        self.assertEqual(result, reference_result)
+        with self.assertRaises(ma.ValidationError):
+            self._load(s, test_dataset)
 
 # class StreamEpochSchemaTestCase
 

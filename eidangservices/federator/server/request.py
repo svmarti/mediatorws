@@ -56,7 +56,10 @@ class RequestHandlerBase(object):
         :py:class:`eidangservices.utils.sncl.StreamEpoch` objects
 
     """
-    HEADERS = {"user-agent": "EIDA-Federator/" + __version__}
+    HEADERS = {"user-agent": "EIDA-Federator/" + __version__,
+               # force no encoding, because eida-federator currently cannot
+               # handle this
+               "Accept-Encoding": ""}
 
     def __init__(self, url, query_params={}, stream_epochs=[]):
         if isinstance(url, bytes):
@@ -130,10 +133,10 @@ class RoutingRequestHandler(RequestHandlerBase):
     """
     QUERY_PARAMS = set(('service',
                         'level',
-                        'minlatitude',
-                        'maxlatitude',
-                        'minlongitude',
-                        'maxlongitude'))
+                        'minlatitude', 'minlat',
+                        'maxlatitude', 'maxlat',
+                        'minlongitude', 'minlon',
+                        'maxlongitude', 'maxlon'))
 
     class GET(object):
         """
@@ -191,7 +194,11 @@ class GranularFdsnRequestHandler(RequestHandlerBase):
     Representation of a FDSN webservice request handler.
     """
     QUERY_PARAMS = set(('service',
-                        'nodata'))
+                        'nodata',
+                        'minlatitude', 'minlat',
+                        'maxlatitude', 'maxlat',
+                        'minlongitude', 'minlon',
+                        'maxlongitude', 'maxlon'))
 
     def __init__(self, url, stream_epoch, query_params={}):
         super().__init__(url, query_params, [stream_epoch])

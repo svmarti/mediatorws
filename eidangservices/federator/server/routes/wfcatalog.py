@@ -64,7 +64,12 @@ class WFCatalogResource(Resource):
 
     @use_args(WFCatalogSchema(), locations=('query',))
     @fdsnws.use_fdsnws_kwargs(
-        ManyStreamEpochSchema(context={'request': request}),
+        ManyStreamEpochSchema(context={'request': request,
+                                       'service': 'eidaws-wfcatalog'}),
+        locations=('query',)
+    )
+    @with_strict_args(
+        (StreamEpochSchema, WFCatalogSchema),
         locations=('query',)
     )
     @with_strict_args(
@@ -81,7 +86,9 @@ class WFCatalogResource(Resource):
         # sanity check - starttime and endtime must be specified
         if (not stream_epochs or stream_epochs[0].starttime is None or
                 stream_epochs[0].endtime is None):
-            raise FDSNHTTPError.create(400, service_version=__version__)
+            raise FDSNHTTPError.create(
+                400, service_version=__version__,
+                error_desc_long='Both starttime and endtime required.')
 
         self.logger.debug('StreamEpoch objects: %r' % stream_epochs)
 
